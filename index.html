@@ -4,48 +4,30 @@
   <title>Leaflet Heatmap</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- Leaflet CSS & JS -->
+  
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
+  
   <style>
-    body, html { margin: 0; padding: 0; height: 100%; }
-    #map { width: 100%; height: 100vh; }
+    body { margin: 0; padding: 0; }
+    #map { height: 100vh; width: 100%; }
   </style>
 </head>
 <body>
 
 <div id="map"></div>
 
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
 <script>
-  // Initialize the map
   const map = L.map('map').setView([20.0, 0.0], 2);
 
-  // Add OpenStreetMap tiles
+  // Add OpenStreetMap tile layer
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
+    maxZoom: 18,
+    attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
-
-  // Function to convert intensity to color
-  function getColorFromIntensity(intensity) {
-    intensity = Math.min(Math.max(intensity, 1), 10);
-    const ratio = (intensity - 1) / 9;
-    const r = Math.floor(0 + (255 - 0) * ratio);
-    const g = Math.floor(128 + (0 - 128) * ratio);
-    return `rgba(${r}, ${g}, 0, 0.5)`;
-  }
-
-  // Function to get dynamic radius based on zoom and intensity
-  function getDynamicRadius(zoom, intensity) {
-    if (zoom < 10.0) {
-      return (200.0 + intensity * 200.0) * (200.0 / 5.0);
-    } else if (zoom < 15.0) {
-      return (200.0 + intensity * 200.0) * (30.0 / zoom);
-    } else {
-      return (200.0 + intensity * 200.0) * (150.0 / zoom);
-    }
-  }
 
   // Fetch data from your API
   async function fetchHeatPoints() {
@@ -56,35 +38,58 @@
       data.forEach(loc => {
         const lat = loc.location.latitude;
         const lng = loc.location.longitude;
-        const intensity = loc.intensity || 10;
+        const intensity = loc.intensity || 1;
 
-        const radius = getDynamicRadius(map.getZoom(), intensity);
         const color = getColorFromIntensity(intensity);
+        const radius = getDynamicRadius(map.getZoom(), intensity);
 
         L.circle([lat, lng], {
+          radius: radius,
           color: color,
           fillColor: color,
-          fillOpacity: 0.5,
-          radius: radius,
+          fillOpacity: 0.6
         }).addTo(map);
       });
 
-    } catch (err) {
-      console.error('Error loading heatmap data:', err);
+    } catch (error) {
+      console.error('Error fetching heat points:', error);
     }
+  }
+
+  function getColorFromIntensity(intensity) {
+    intensity = Math.max(1, Math.min(intensity, 10));
+    const ratio = (intensity - 1) / 9;
+    const r = Math.floor(0 + ratio * (255 - 0));
+    const g = Math.floor(128 - ratio * 128);
+    return `rgb(${r},${g},0)`;
+  }
+
+  function getDynamicRadius(zoom, intensity) {
+    if (zoom < 10.0) {
+      return (200.0 + intensity * 200.0) * (200.0 / 5.0);
+    } else if (zoom < 15.0) {
+      return (200.0 + intensity * 200.0) * (30.0 / zoom);
+    } else if (zoom < 20) {
+      return (200.0 + intensity * 200.0) * (150.0 / zoom);
+    }
+    return (200.0 + intensity * 200.0) * (150.0 / zoom);
   }
 
   fetchHeatPoints();
 
-  // Optional: Refresh data on zoom to update radius dynamically
-  map.on('zoomend', () => {
-    map.eachLayer(layer => {
-      if (layer instanceof L.Circle) {
-        map.removeLayer(layer);
-      }
+  // Optional: get user's current location
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(position => {
+      const userLatLng = [position.coords.latitude, position.coords.longitude];
+      L.marker(userLatLng, {
+        icon: L.icon({
+          iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+          iconSize: [24, 24]
+        })
+      }).addTo(map).bindPopup('You are here').openPopup();
+      map.setView(userLatLng, 14);
     });
-    fetchHeatPoints();
-  });
+  }
 </script>
 
 </body>
