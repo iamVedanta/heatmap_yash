@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Leaflet Heatmap</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <style>
+    body, html { margin: 0; padding: 0; height: 100%; }
+    #map { width: 100%; height: 100vh; }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+  // Initialize the map
+  const map = L.map('map').setView([20.0, 0.0], 2);
+
+  // Add OpenStreetMap tiles
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+  }).addTo(map);
+
+  // Function to convert intensity to color
+  function getColorFromIntensity(intensity) {
+    intensity = Math.min(Math.max(intensity, 1), 10);
+    const ratio = (intensity - 1) / 9;
+    const r = Math.floor(0 + (255 - 0) * ratio);
+    const g = Math.floor(128 + (0 - 128) * ratio);
+    return `rgba(${r}, ${g}, 0, 0.5)`;
+  }
+
+  // Function to get dynamic radius based on zoom and intensity
+  function getDynamicRadius(zoom, intensity) {
+    if (zoom < 10.0) {
+      return (200.0 + intensity * 200.0) * (200.0 / 5.0);
+    } else if (zoom < 15.0) {
+      return (200.0 + intensity * 200.0) * (30.0 / zoom);
+    } else {
+      return (200.0 + intensity * 200.0) * (150.0 / zoom);
+    }
+  }
+
+  // Fetch data from your API
+  async function fetchHeatPoints() {
+    try {
+      const response = await fetch('https://heatmap-o3xw.onrender.com/api/reports');
+      const data = await response.json();
+
+      data.forEach(loc => {
+        const lat = loc.location.latitude;
+        const lng = loc.location.longitude;
+        const intensity = loc.intensity || 10;
+
+        const radius = getDynamicRadius(map.getZoom(), intensity);
+        const color = getColorFromIntensity(intensity);
+
+        L.circle([lat, lng], {
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.5,
+          radius: radius,
+        }).addTo(map);
+      });
+
+    } catch (err) {
+      console.error('Error loading heatmap data:', err);
+    }
+  }
+
+  fetchHeatPoints();
+
+  // Optional: Refresh data on zoom to update radius dynamically
+  map.on('zoomend', () => {
+    map.eachLayer(layer => {
+      if (layer instanceof L.Circle) {
+        map.removeLayer(layer);
+      }
+    });
+    fetchHeatPoints();
+  });
+</script>
+
+</body>
+</html>
