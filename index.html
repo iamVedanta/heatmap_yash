@@ -1,96 +1,75 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-  <title>Leaflet Heatmap</title>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  
-  <style>
-    body { margin: 0; padding: 0; }
-    #map { height: 100vh; width: 100%; }
-  </style>
+    <title>Leaflet.heat demo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+        integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"
+        integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+
+    <!-- Link to Leaflet Heatmap plugin -->
+    <script src="https://unpkg.com/leaflet-heat/dist/leaflet-heat.js"></script>
+
+    <style>
+        #map {
+            width: 100%;
+            height: 98vh;
+        }
+        body {
+            font: 16px/1.4 "Helvetica Neue", Arial, sans-serif;
+        }
+    </style>
 </head>
+
 <body>
+    <div id="map"></div>
 
-<div id="map"></div>
+    <script>
+        // Initialize the map
+        var map = L.map('map', {
+            center: [12.295810, 76.639381],
+            zoom: 13
+        });
 
-<!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<script>
-  const map = L.map('map').setView([20.0, 0.0], 2);
-
-  // Add OpenStreetMap tile layer
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-
-  // Fetch data from your API
-  async function fetchHeatPoints() {
-    try {
-      const response = await fetch('https://heatmap-o3xw.onrender.com/api/reports');
-      const data = await response.json();
-
-      data.forEach(loc => {
-        const lat = loc.location.latitude;
-        const lng = loc.location.longitude;
-        const intensity = loc.intensity || 1;
-
-        const color = getColorFromIntensity(intensity);
-        const radius = getDynamicRadius(map.getZoom(), intensity);
-
-        L.circle([lat, lng], {
-          radius: radius,
-          color: color,
-          fillColor: color,
-          fillOpacity: 0.6
+        // Add OpenStreetMap tile layer
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'Her Safety'
         }).addTo(map);
-      });
 
-    } catch (error) {
-      console.error('Error fetching heat points:', error);
-    }
-  }
+        // Fetch the heat data from your backend (replace with your API endpoint)
+        async function fetchHeatData() {
+            try {
+                // Replace with your actual API endpoint
+                const response = await fetch('https://heatmap-o3xw.onrender.com/api/reports');
+                const data = await response.json();
 
-  function getColorFromIntensity(intensity) {
-    intensity = Math.max(1, Math.min(intensity, 10));
-    const ratio = (intensity - 1) / 9;
-    const r = Math.floor(0 + ratio * (255 - 0));
-    const g = Math.floor(128 - ratio * 128);
-    return `rgb(${r},${g},0)`;
-  }
+                // Process the data to fit the heatmap structure
+                var addressPoints = data.map(item => {
+                    // Assuming the API response has latitude, longitude, and intensity
+                    return [item.location.latitude, item.location.longitude, item.intensity || 1];
+                });
 
-  function getDynamicRadius(zoom, intensity) {
-    if (zoom < 10.0) {
-      return (200.0 + intensity * 200.0) * (200.0 / 5.0);
-    } else if (zoom < 15.0) {
-      return (200.0 + intensity * 200.0) * (30.0 / zoom);
-    } else if (zoom < 20) {
-      return (200.0 + intensity * 200.0) * (150.0 / zoom);
-    }
-    return (200.0 + intensity * 200.0) * (150.0 / zoom);
-  }
+                // Create the heatmap layer
+                var heatLayer = L.heatLayer(addressPoints, {
+                    radius: 25,
+                    blur: 15,
+                    gradient: {
+                        0.0: 'blue',   // Safe zones (rating 0)
+                        0.3: 'lime',   // Slight caution (rating ~3)
+                        0.6: 'yellow', // Moderate caution (rating ~6)
+                        1.0: 'red'     // Dangerous (rating ~10)
+                    }
+                }).addTo(map);
 
-  fetchHeatPoints();
+            } catch (error) {
+                console.error('Error fetching heat data:', error);
+            }
+        }
 
-  // Optional: get user's current location
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(position => {
-      const userLatLng = [position.coords.latitude, position.coords.longitude];
-      L.marker(userLatLng, {
-        icon: L.icon({
-          iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-          iconSize: [24, 24]
-        })
-      }).addTo(map).bindPopup('You are here').openPopup();
-      map.setView(userLatLng, 14);
-    });
-  }
-</script>
-
+        // Fetch and display the heatmap data
+        fetchHeatData();
+    </script>
 </body>
+
 </html>
